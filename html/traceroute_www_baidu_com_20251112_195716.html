@@ -1,0 +1,285 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路由追踪地图可视化 - www.baidu.com</title>
+    <!-- 引入百度地图API -->
+    <script type="text/javascript" src="https://api.map.baidu.com/api?v=3.0&ak=您的密钥"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .route-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .route-table th, .route-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .route-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .route-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .map-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        #map {
+            width: 100%;
+            height: 500px;
+        }
+        .map-legend {
+            padding: 10px 20px;
+            background-color: #fff;
+            border-top: 1px solid #ddd;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        .api-tip {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>路由追踪地图可视化 - www.baidu.com</h1>
+    
+    <div class="map-container">
+        <!-- API密钥提示 -->
+        <div class="api-tip">
+            提示：请在代码中替换"您的密钥"为您申请的百度地图API密钥，否则地图无法正常显示。
+            <a href="https://lbsyun.baidu.com/apiconsole/key/create" target="_blank">点击申请百度地图API密钥</a>
+        </div>
+        
+        <!-- 百度地图容器 -->
+        <div id="map"></div>
+        
+        <div class="map-legend">
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:16px;height:16px;background:#2196F3;border-radius:50%;margin-right:5px;"></span>起始节点</span>
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:16px;height:16px;background:#F44336;border-radius:50%;margin-right:5px;"></span>终点节点</span>
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:16px;height:16px;background:#4CAF50;border-radius:50%;margin-right:5px;"></span>中间节点</span>
+            <span style="display:inline-block;"><span style="display:inline-block;width:20px;height:2px;background:#FF9800;margin-right:5px;"></span>路由路径</span>
+        </div>
+    </div>
+    
+    <h2>路由节点详情</h2>
+    <table class="route-table">
+        <tr>
+            <th>序号</th>
+            <th>IP地址</th>
+            <th>城市</th>
+            <th>所有者</th>
+            <th>延迟(ms)</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>192.168.1.1</td>
+            <td>本地网络</td>
+            <td>局域网</td>
+            <td>2.50</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>10.0.0.1</td>
+            <td>运营商网络</td>
+            <td>ISP</td>
+            <td>5.20</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>202.108.22.5</td>
+            <td>China Beijing</td>
+            <td>China Telecom</td>
+            <td>15.30</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>180.76.15.1</td>
+            <td>China Beijing</td>
+            <td>Baidu CDN</td>
+            <td>20.10</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>123.125.81.12</td>
+            <td>China Beijing</td>
+            <td>Baidu Server</td>
+            <td>25.40</td>
+        </tr>
+    </table>
+    
+    <div class="footer">
+        <p>生成时间: 2025-11-12 19:57:16</p>
+        <p>包含 5 个路由节点的可视化</p>
+    </div>
+    
+    <script type="text/javascript">
+        // 路由节点数据
+        var routePoints = [[117.0, 27.0], [78.0, 28.0], [87.0, 37.0], [123.0, 33.0], [72.0, 22.0]];
+        var markersData = [{"point": [117.0, 27.0], "type": "start", "info": {"hop": "1", "ip": "192.168.1.1", "city": "本地网络", "owner": "局域网", "rtt": "2.50"}}, {"point": [78.0, 28.0], "type": "middle", "info": {"hop": "2", "ip": "10.0.0.1", "city": "运营商网络", "owner": "ISP", "rtt": "5.20"}}, {"point": [87.0, 37.0], "type": "middle", "info": {"hop": "3", "ip": "202.108.22.5", "city": "China Beijing", "owner": "China Telecom", "rtt": "15.30"}}, {"point": [123.0, 33.0], "type": "middle", "info": {"hop": "4", "ip": "180.76.15.1", "city": "China Beijing", "owner": "Baidu CDN", "rtt": "20.10"}}, {"point": [72.0, 22.0], "type": "end", "info": {"hop": "5", "ip": "123.125.81.12", "city": "China Beijing", "owner": "Baidu Server", "rtt": "25.40"}}];
+        
+        // 初始化地图
+        var map = new BMap.Map("map");
+        
+        // 计算地图中心点和缩放级别
+        if (routePoints.length > 0) {
+            // 设置地图中心点为第一个节点
+            var centerPoint = new BMap.Point(routePoints[0][0], routePoints[0][1]);
+            map.centerAndZoom(centerPoint, 10);
+            
+            // 添加缩放控件
+            map.addControl(new BMap.NavigationControl());
+            
+            // 添加比例尺控件
+            map.addControl(new BMap.ScaleControl());
+            
+            // 添加地图类型控件
+            map.addControl(new BMap.MapTypeControl());
+            
+            // 启用滚轮缩放
+            map.enableScrollWheelZoom(true);
+            
+            // 创建覆盖物数组
+            var points = [];
+            
+            // 添加路由节点标记
+            for (var i = 0; i < markersData.length; i++) {
+                var data = markersData[i];
+                var point = new BMap.Point(data.point[0], data.point[1]);
+                points.push(point);
+                
+                // 根据节点类型设置颜色
+                var color = "#4CAF50"; // 中间节点默认绿色
+                if (data.type === "start") {
+                    color = "#2196F3"; // 起始节点蓝色
+                } else if (data.type === "end") {
+                    color = "#F44336"; // 终点节点红色
+                }
+                
+                // 创建自定义图标
+                var icon = new BMap.Icon(
+                    "https://api.map.baidu.com/library/SmartMarker/1.2/examples/markers.png",
+                    new BMap.Size(23, 25),
+                    {
+                        offset: new BMap.Size(10, 25),
+                        imageOffset: new BMap.Size(0, 0)
+                    }
+                );
+                
+                // 使用圆形标记代替默认图标，更清晰
+                var marker = new BMap.Marker(point);
+                
+                // 设置标记样式
+                marker.setAnimation(BMAP_ANIMATION_DROP); // 添加掉落动画
+                
+                // 创建信息窗口内容
+                var infoWindowContent = "" +
+                    "<div style='padding:10px;'>" +
+                    "<p><strong>序号:</strong> " + data.info.hop + "</p>" +
+                    "<p><strong>IP地址:</strong> " + data.info.ip + "</p>" +
+                    "<p><strong>城市:</strong> " + data.info.city + "</p>" +
+                    "<p><strong>所有者:</strong> " + data.info.owner + "</p>" +
+                    "<p><strong>延迟:</strong> " + data.info.rtt + "ms</p>" +
+                    "</div>";
+                
+                // 创建信息窗口
+                var infoWindow = new BMap.InfoWindow(infoWindowContent);
+                
+                // 绑定点击事件
+                marker.addEventListener("click", function(e) {
+                    this.openInfoWindow(infoWindow);
+                });
+                
+                // 为标记添加序号
+                var label = new BMap.Label((i + 1).toString(), {
+                    offset: new BMap.Size(-5, -15)
+                });
+                label.setStyle({
+                    color: "white",
+                    backgroundColor: color,
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "20px",
+                    height: "20px",
+                    lineHeight: "20px",
+                    textAlign: "center",
+                    fontSize: "12px",
+                    fontWeight: "bold"
+                });
+                marker.setLabel(label);
+                
+                // 设置标记的图标样式（通过Marker.setStyle方法）
+                marker.setStyle({
+                    backgroundColor: color,
+                    borderColor: color
+                });
+                
+                // 添加标记到地图
+                map.addOverlay(marker);
+            }
+            
+            // 绘制路由路径
+            if (points.length > 1) {
+                var polyline = new BMap.Polyline(points, {
+                    strokeColor: "#FF9800",
+                    strokeWeight: 5,
+                    strokeOpacity: 0.8,
+                    strokeStyle: "dashed"
+                });
+                map.addOverlay(polyline);
+                
+                // 调整地图视野，使所有点都可见
+                var view = map.getViewport(points);
+                var mapZoom = view.zoom;
+                var centerPoint = view.center;
+                map.centerAndZoom(centerPoint, mapZoom - 1); // 缩小一级以便更好地显示所有点
+            }
+        }
+        
+        // 添加地图加载完成事件
+        map.addEventListener("tilesloaded", function() {
+            console.log("百度地图加载完成");
+        });
+        
+        // 添加错误处理
+        window.addEventListener("error", function(e) {
+            if (e.target && e.target.src && e.target.src.includes("api.map.baidu.com")) {
+                alert("百度地图加载失败，请检查API密钥是否正确设置");
+            }
+        });
+    </script>
+</body>
+</html>

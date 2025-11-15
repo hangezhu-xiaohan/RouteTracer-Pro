@@ -1,0 +1,242 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路由追踪地图可视化 - www.baidu.com</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .route-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .route-table th, .route-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .route-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .route-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .map-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .map-svg {
+            width: 100%;
+            height: 500px;
+            background-color: #e6f7ff;
+        }
+        .map-legend {
+            padding: 10px 20px;
+            background-color: #fff;
+            border-top: 1px solid #ddd;
+            font-size: 14px;
+            color: #666;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+        }
+        .node-label {
+            font-size: 12px;
+            fill: #333;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+        .node {
+            fill: #4CAF50;
+            stroke: #333;
+            stroke-width: 1;
+            cursor: pointer;
+        }
+        .start-node {
+            fill: #2196F3;
+        }
+        .end-node {
+            fill: #F44336;
+        }
+        .route-path {
+            fill: none;
+            stroke: #FF9800;
+            stroke-width: 3;
+            stroke-dasharray: 5,5;
+        }
+        .china-map {
+            fill: #c8e6c9;
+            stroke: #81c784;
+            stroke-width: 1;
+        }
+        .tooltip {
+            position: absolute;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+            pointer-events: none;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <h1>路由追踪地图可视化 - www.baidu.com</h1>
+    
+    <div class="map-container">
+        <svg class="map-svg" viewBox="0 0 800 500">
+            <!-- 简单的中国地图轮廓 -->
+            <path class="china-map" d="M 120,100 C 130,150 180,200 200,250 C 220,300 200,350 180,400 C 160,420 130,430 100,410 C 70,390 50,350 80,300 C 110,250 100,150 120,100 Z" />
+            
+            <!-- 路由路径 -->
+            <path class="route-path" d="M 501.61290322580646,392.8571428571429 L 83.87096774193549,358.5714285714286 L 264.51612903225805,404.2857142857143 L 230.64516129032256,210.0 L 241.93548387096772,427.1428571428571" />
+            
+            <!-- 路由节点 -->
+            
+            <g class="node-group">
+                <circle cx="501.61290322580646" cy="392.8571428571429" r="8" class="node start-node" title="192.168.1.1
+本地网络
+延迟: 2.50ms" />
+                <text x="501.61290322580646" y="392.8571428571429" class="node-label">1</text>
+            </g>
+            <g class="node-group">
+                <circle cx="83.87096774193549" cy="358.5714285714286" r="8" class="node" title="10.0.0.1
+运营商网络
+延迟: 5.20ms" />
+                <text x="83.87096774193549" y="358.5714285714286" class="node-label">2</text>
+            </g>
+            <g class="node-group">
+                <circle cx="264.51612903225805" cy="404.2857142857143" r="8" class="node" title="202.108.22.5
+China Beijing
+延迟: 15.30ms" />
+                <text x="264.51612903225805" y="404.2857142857143" class="node-label">3</text>
+            </g>
+            <g class="node-group">
+                <circle cx="230.64516129032256" cy="210.0" r="8" class="node" title="180.76.15.1
+China Beijing
+延迟: 20.10ms" />
+                <text x="230.64516129032256" y="210.0" class="node-label">4</text>
+            </g>
+            <g class="node-group">
+                <circle cx="241.93548387096772" cy="427.1428571428571" r="8" class="node end-node" title="123.125.81.12
+China Beijing
+延迟: 25.40ms" />
+                <text x="241.93548387096772" y="427.1428571428571" class="node-label">5</text>
+            </g>
+        </svg>
+        <div class="map-legend">
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:10px;height:10px;background:#2196F3;border-radius:50%;margin-right:5px;"></span>起始节点</span>
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:10px;height:10px;background:#F44336;border-radius:50%;margin-right:5px;"></span>终点节点</span>
+            <span style="display:inline-block;margin-right:15px;"><span style="display:inline-block;width:10px;height:10px;background:#4CAF50;border-radius:50%;margin-right:5px;"></span>中间节点</span>
+            <span style="display:inline-block;"><span style="display:inline-block;width:20px;height:2px;background:#FF9800;margin-right:5px;"></span>路由路径</span>
+        </div>
+    </div>
+    
+    <h2>路由节点详情</h2>
+    <table class="route-table">
+        <tr>
+            <th>序号</th>
+            <th>IP地址</th>
+            <th>城市</th>
+            <th>所有者</th>
+            <th>延迟(ms)</th>
+        </tr>
+        <tr>
+            <td>1</td>
+            <td>192.168.1.1</td>
+            <td>本地网络</td>
+            <td>局域网</td>
+            <td>2.50</td>
+        </tr>
+        <tr>
+            <td>2</td>
+            <td>10.0.0.1</td>
+            <td>运营商网络</td>
+            <td>ISP</td>
+            <td>5.20</td>
+        </tr>
+        <tr>
+            <td>3</td>
+            <td>202.108.22.5</td>
+            <td>China Beijing</td>
+            <td>China Telecom</td>
+            <td>15.30</td>
+        </tr>
+        <tr>
+            <td>4</td>
+            <td>180.76.15.1</td>
+            <td>China Beijing</td>
+            <td>Baidu CDN</td>
+            <td>20.10</td>
+        </tr>
+        <tr>
+            <td>5</td>
+            <td>123.125.81.12</td>
+            <td>China Beijing</td>
+            <td>Baidu Server</td>
+            <td>25.40</td>
+        </tr>
+    </table>
+    
+    <div class="footer">
+        <p>生成时间: 2025-11-12 19:46:05</p>
+        <p>包含 5 个路由节点的可视化</p>
+    </div>
+    
+    <script>
+        // 添加简单的交互功能
+        document.addEventListener('DOMContentLoaded', function() {
+            // 创建提示框
+            const tooltip = document.createElement('div');
+            tooltip.className = 'tooltip';
+            document.body.appendChild(tooltip);
+            
+            // 为节点添加鼠标事件
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                node.addEventListener('mouseover', function(e) {
+                    const title = this.getAttribute('title');
+                    tooltip.textContent = title;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY - 30) + 'px';
+                });
+                
+                node.addEventListener('mousemove', function(e) {
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY - 30) + 'px';
+                });
+                
+                node.addEventListener('mouseout', function() {
+                    tooltip.style.display = 'none';
+                });
+            });
+        });
+    </script>
+</body>
+</html>
