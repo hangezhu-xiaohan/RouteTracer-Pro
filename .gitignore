@@ -167,3 +167,6 @@ dist/
 # Configuration files (if containing sensitive info)
 config.json
 settings.json
+
+# Unused directories
+tracemap_temp/
