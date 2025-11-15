@@ -13,7 +13,8 @@ base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(base_dir)
 
 # 简单检查tracemap目录是否存在
-tracemap_dir = os.path.join(base_dir, 'tracemap')
+# tracemap目录在ui目录下
+tracemap_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tracemap')
 TRACEMAP_AVAILABLE = os.path.exists(tracemap_dir) and os.path.exists(os.path.join(tracemap_dir, '__init__.py'))
 
 # 如果tracemap目录存在，尝试导入必要的函数
