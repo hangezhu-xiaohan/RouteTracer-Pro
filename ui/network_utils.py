@@ -14,6 +14,21 @@ import select
 import re
 
 
+def get_subprocess_kwargs():
+    """获取subprocess调用的关键字参数，用于隐藏Windows控制台窗口"""
+    kwargs = {
+        'env': {**os.environ, 'PYTHONIOENCODING': 'utf-8'}
+    }
+    
+    # 在Windows系统中隐藏控制台窗口
+    if platform.system() == 'Windows':
+        # 创建标志：隐藏窗口
+        CREATE_NO_WINDOW = 0x08000000
+        kwargs['creationflags'] = CREATE_NO_WINDOW
+    
+    return kwargs
+
+
 class NetworkUtils:
     def __init__(self):
         self.geoip_cache = {}
@@ -729,7 +744,8 @@ class NetworkUtils:
                 stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
-                universal_newlines=True
+                universal_newlines=True,
+                **get_subprocess_kwargs()
             )
 
             # 通过回调函数传递进程引用，以便GUI层可以取消进程
@@ -931,7 +947,8 @@ class NetworkUtils:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                **get_subprocess_kwargs()
             )
             stdout, stderr = process.communicate()
 
@@ -958,7 +975,8 @@ class NetworkUtils:
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                **get_subprocess_kwargs()
             )
             stdout, stderr = process.communicate()
 

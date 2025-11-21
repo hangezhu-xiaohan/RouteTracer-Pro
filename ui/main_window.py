@@ -44,6 +44,9 @@ class DNSAnalyzerApp:
         self.root.title("RouteTracer Pro v2.0 - 专业路由追踪工具 - 作者：小韩-www.xiaohan.ac.cn")
         self.root.geometry("1200x800")
 
+        # 设置窗口关闭事件处理
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
         # 初始化中文字体
         self.setup_chinese_font()
 
@@ -53,6 +56,10 @@ class DNSAnalyzerApp:
         self.monitor_thread = None
         self.comparison_data = []
         self.trace_data = []  # 添加traceroute数据存储
+
+        # 初始化线程控制变量
+        self.running_threads = []
+        self.is_closing = False
 
         self.setup_ui()
         self.setup_about_info()
@@ -435,6 +442,118 @@ class DNSAnalyzerApp:
         # 关闭按钮
         ttk.Button(about_window, text="关闭", command=about_window.destroy).pack(pady=10)
 
+    def on_closing(self):
+        """处理窗口关闭事件"""
+        if self.is_closing:
+            return  # 防止重复调用
+        
+        self.is_closing = True
+        
+        try:
+            # 停止所有正在进行的操作
+            self.stop_all_operations()
+            
+            # 等待所有线程结束
+            self.wait_for_threads_to_finish()
+            
+            # 销毁窗口
+            self.root.destroy()
+            
+            # 强制退出程序，确保所有进程都结束
+            import sys
+            import os
+            
+            # 获取当前进程ID
+            current_pid = os.getpid()
+            
+            # 在Windows上强制终止进程
+            if platform.system() == "Windows":
+                import subprocess
+                try:
+                    subprocess.run(['taskkill', '/F', '/PID', str(current_pid)], 
+                                 check=False, capture_output=True)
+                except:
+                    pass
+            else:
+                # Unix-like系统
+                os._exit(0)
+            
+        except Exception as e:
+            print(f"关闭窗口时出错: {e}")
+            # 强制退出
+            try:
+                import sys
+                sys.exit(0)
+            except:
+                import os
+                os._exit(0)
+
+    def stop_all_operations(self):
+        """停止所有正在进行的操作"""
+        try:
+            # 停止监控
+            if self.is_monitoring and self.monitor_thread:
+                self.is_monitoring = False
+                if hasattr(self, 'monitor_button'):
+                    self.monitor_button.config(text="开始监控", state='normal')
+                if hasattr(self, 'monitor_progress'):
+                    self.monitor_progress.stop()
+
+            # 停止路由跟踪
+            if hasattr(self, 'is_tracing') and self.is_tracing:
+                self.is_tracing = False
+                if hasattr(self, 'trace_process') and self.trace_process:
+                    try:
+                        self.trace_process.terminate()
+                    except:
+                        pass
+                if hasattr(self, 'trace_button'):
+                    self.trace_button.config(state='normal')
+                if hasattr(self, 'cancel_trace_button'):
+                    self.cancel_trace_button.config(state='disabled')
+                if hasattr(self, 'trace_progress'):
+                    self.trace_progress.stop()
+
+            # 停止批量测试
+            if hasattr(self, 'is_batch_testing') and self.is_batch_testing:
+                self.is_batch_testing = False
+                if hasattr(self, 'batch_test_button'):
+                    self.batch_test_button.config(text="开始批量测试", state='normal')
+                if hasattr(self, 'batch_progress'):
+                    self.batch_progress.stop()
+
+        except Exception as e:
+            print(f"停止操作时出错: {e}")
+
+    def wait_for_threads_to_finish(self):
+        """等待所有线程结束"""
+        try:
+            # 等待监控线程结束
+            if hasattr(self, 'monitor_thread') and self.monitor_thread and self.monitor_thread.is_alive():
+                self.monitor_thread.join(timeout=1.0)  # 减少等待时间
+
+            # 等待路由跟踪线程结束
+            if hasattr(self, 'trace_thread') and self.trace_thread and self.trace_thread.is_alive():
+                self.trace_thread.join(timeout=1.0)
+
+            # 等待其他线程结束
+            for thread in self.running_threads:
+                if thread.is_alive():
+                    thread.join(timeout=0.5)  # 更短的等待时间
+
+        except Exception as e:
+            print(f"等待线程结束时出错: {e}")
+
+    def add_running_thread(self, thread):
+        """添加正在运行的线程到列表"""
+        if thread not in self.running_threads:
+            self.running_threads.append(thread)
+
+    def remove_running_thread(self, thread):
+        """从列表中移除已结束的线程"""
+        if thread in self.running_threads:
+            self.running_threads.remove(thread)
+
 
     def setup_traceroute_chart(self):
         """设置路由图"""
@@ -565,6 +684,7 @@ class DNSAnalyzerApp:
             args=(hostname, max_hops, timeout, timeout_ms)
         )
         self.trace_thread.daemon = True
+        self.add_running_thread(self.trace_thread)
         self.trace_thread.start()
 
     def _is_ip_address(self, hostname):
@@ -1221,12 +1341,12 @@ class DNSAnalyzerApp:
             self.trace_data = []
 
             def execute_traceroute():
-                results = []
-                method = self.trace_method.get()
-
-                self.root.after(0, lambda: self.trace_status.config(text=f"使用 {method.upper()} 方法进行路由跟踪..."))
-
                 try:
+                    results = []
+                    method = self.trace_method.get()
+
+                    self.root.after(0, lambda: self.trace_status.config(text=f"使用 {method.upper()} 方法进行路由跟踪..."))
+
                     # 根据选择的方法调用对应的traceroute函数
                     if method == "system":
                         # 对于system方法，使用回调函数实时更新结果
@@ -1271,7 +1391,8 @@ class DNSAnalyzerApp:
                                 errors='replace',
                                 universal_newlines=True,
                                 bufsize=1,
-                                env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}
+                                env={**os.environ, 'PYTHONIOENCODING': 'utf-8'},
+                                creationflags=0x08000000 if os.name == 'nt' else 0
                             )
                             # 保存进程引用以便取消功能使用
                             self.trace_process = process
@@ -1334,10 +1455,15 @@ class DNSAnalyzerApp:
                     if method == "nexttrace":
                         error_msg += "。请确保NextTrace可执行文件已正确安装并在系统PATH中。"
                     self.root.after(0, lambda: self.trace_status.config(text=error_msg))
+                finally:
+                    # 线程结束时从运行线程列表中移除
+                    current_thread = threading.current_thread()
+                    self.remove_running_thread(current_thread)
 
             # 在后台线程中执行
             thread = threading.Thread(target=execute_traceroute)
             thread.daemon = True
+            self.add_running_thread(thread)
             thread.start()
 
         except Exception as e:
@@ -1585,6 +1711,7 @@ class DNSAnalyzerApp:
 
         thread = threading.Thread(target=self.run_ping_test, args=(hostname,))
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
 
     def run_ping_test(self, hostname):
@@ -1614,6 +1741,10 @@ class DNSAnalyzerApp:
 
         except Exception as e:
             self.root.after(0, lambda: self.trace_status.config(text=f"Ping测试失败: {str(e)}"))
+        finally:
+            # 移除当前线程
+            current_thread = threading.current_thread()
+            self.root.after(0, lambda: self.remove_running_thread(current_thread))
 
     def clear_traceroute_results(self):
         """清除路由跟踪结果"""
@@ -1699,6 +1830,7 @@ class DNSAnalyzerApp:
         # 在新线程中生成地图，避免UI卡顿
         thread = threading.Thread(target=self.run_generate_tracemap, args=(hostname,))
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
         
         # 显示生成中的提示
@@ -1738,6 +1870,9 @@ class DNSAnalyzerApp:
             # 确保按钮状态正确恢复
             if hasattr(self, 'generate_map_button'):
                 self.root.after(0, lambda: self.generate_map_button.config(state=tk.NORMAL))
+            # 线程结束时从运行线程列表中移除
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def setup_quick_test_tab(self, notebook):
         """快速测试标签页"""
@@ -2118,33 +2253,42 @@ stackoverflow.com"""
         # 在新线程中执行测试
         thread = threading.Thread(target=self.run_quick_test, args=(domain, dns_server, record_type))
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
 
     def run_quick_test(self, domain, dns_server, record_type):
         """执行快速测试"""
-        iterations = int(self.iterations_entry.get())
-        times = []
+        try:
+            iterations = int(self.iterations_entry.get())
+            times = []
 
-        for i in range(iterations):
-            result = self.test_dns_resolution(domain, dns_server, record_type)
+            for i in range(iterations):
+                result = self.test_dns_resolution(domain, dns_server, record_type)
 
-            # 在UI线程中更新结果
-            self.root.after(0, self.update_result_tree, i + 1, domain, dns_server, record_type, result)
+                # 在UI线程中更新结果
+                self.root.after(0, self.update_result_tree, i + 1, domain, dns_server, record_type, result)
 
-            if result['success']:
-                times.append(result['time_ms'])
+                if result['success']:
+                    times.append(result['time_ms'])
 
-            time.sleep(0.5)  # 短暂延迟
+                time.sleep(0.5)  # 短暂延迟
 
-        # 更新统计信息
-        if times:
-            avg_time = sum(times) / len(times)
-            min_time = min(times)
-            max_time = max(times)
-            success_rate = len(times) / iterations
+            # 更新统计信息
+            if times:
+                avg_time = sum(times) / len(times)
+                min_time = min(times)
+                max_time = max(times)
+                success_rate = len(times) / iterations
 
-            stats_text = f"平均: {avg_time:.2f}ms, 最快: {min_time:.2f}ms, 最慢: {max_time:.2f}ms, 成功率: {success_rate:.1%}"
-            self.root.after(0, lambda: self.stats_label.config(text=stats_text))
+                stats_text = f"平均: {avg_time:.2f}ms, 最快: {min_time:.2f}ms, 最慢: {max_time:.2f}ms, 成功率: {success_rate:.1%}"
+                self.root.after(0, lambda: self.stats_label.config(text=stats_text))
+        except Exception as e:
+            error_msg = f"快速测试失败: {str(e)}"
+            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+        finally:
+            # 线程结束时移除自己
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def update_result_tree(self, index, domain, dns_server, record_type, result):
         """更新结果树形视图"""
@@ -2188,36 +2332,45 @@ stackoverflow.com"""
         # 在新线程中执行批量测试
         thread = threading.Thread(target=self.run_batch_test, args=(domains, dns_server))
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
 
     def run_batch_test(self, domains, dns_server):
         """执行批量测试"""
-        # 清空之前的结果
-        self.root.after(0, lambda: self.batch_tree.delete(*self.batch_tree.get_children()))
+        try:
+            # 清空之前的结果
+            self.root.after(0, lambda: self.batch_tree.delete(*self.batch_tree.get_children()))
 
-        for domain in domains:
-            times = []
-            successes = 0
-            iterations = 3  # 每个域名测试3次
+            for domain in domains:
+                times = []
+                successes = 0
+                iterations = 3  # 每个域名测试3次
 
-            for i in range(iterations):
-                result = self.test_dns_resolution(domain, dns_server, 'A')
-                if result['success']:
-                    times.append(result['time_ms'])
-                    successes += 1
-                time.sleep(0.5)
+                for i in range(iterations):
+                    result = self.test_dns_resolution(domain, dns_server, 'A')
+                    if result['success']:
+                        times.append(result['time_ms'])
+                        successes += 1
+                    time.sleep(0.5)
 
-            if times:
-                avg_time = sum(times) / len(times)
-                min_time = min(times)
-                max_time = max(times)
-                success_rate = successes / iterations
-            else:
-                avg_time = min_time = max_time = 0
-                success_rate = 0
+                if times:
+                    avg_time = sum(times) / len(times)
+                    min_time = min(times)
+                    max_time = max(times)
+                    success_rate = successes / iterations
+                else:
+                    avg_time = min_time = max_time = 0
+                    success_rate = 0
 
-            # 更新UI
-            self.root.after(0, self.update_batch_tree, domain, dns_server, avg_time, min_time, max_time, success_rate)
+                # 更新UI
+                self.root.after(0, self.update_batch_tree, domain, dns_server, avg_time, min_time, max_time, success_rate)
+        except Exception as e:
+            error_msg = f"批量测试失败: {str(e)}"
+            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+        finally:
+            # 线程结束时移除自己
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def update_batch_tree(self, domain, dns_server, avg_time, min_time, max_time, success_rate):
         """更新批量测试结果树形视图"""
@@ -2254,6 +2407,7 @@ stackoverflow.com"""
         # 在新线程中执行监控
         self.monitor_thread = threading.Thread(target=self.run_monitoring, args=(domain, interval, duration))
         self.monitor_thread.daemon = True
+        self.add_running_thread(self.monitor_thread)
         self.monitor_thread.start()
 
     def stop_monitoring(self):
@@ -2264,35 +2418,44 @@ stackoverflow.com"""
 
     def run_monitoring(self, domain, interval, duration):
         """执行监控"""
-        dns_server = self.dns_combo.get()
-        start_time = time.time()
-        end_time = start_time + duration
+        try:
+            dns_server = self.dns_combo.get()
+            start_time = time.time()
+            end_time = start_time + duration
 
-        while self.is_monitoring and time.time() < end_time:
-            result = self.test_dns_resolution(domain, dns_server, 'A')
+            while self.is_monitoring and time.time() < end_time:
+                result = self.test_dns_resolution(domain, dns_server, 'A')
 
-            current_time = time.time()
-            if result['success']:
-                self.monitor_times.append(result['time_ms'])
-                self.monitor_timestamps.append(current_time)
-                self.monitor_results.append(result['results'])  # 保存解析结果
+                current_time = time.time()
+                if result['success']:
+                    self.monitor_times.append(result['time_ms'])
+                    self.monitor_timestamps.append(current_time)
+                    self.monitor_results.append(result['results'])  # 保存解析结果
 
-                # 更新图表
-                self.root.after(0, self.update_chart)
+                    # 更新图表
+                    self.root.after(0, self.update_chart)
 
-                status_text = f"最后解析: {result['time_ms']:.2f}ms - {time.strftime('%H:%M:%S')}"
-            else:
-                status_text = f"解析失败 - {time.strftime('%H:%M:%S')}"
+                    status_text = f"最后解析: {result['time_ms']:.2f}ms - {time.strftime('%H:%M:%S')}"
+                else:
+                    status_text = f"解析失败 - {time.strftime('%H:%M:%S')}"
 
-            self.root.after(0, lambda: self.monitor_status.config(text=status_text))
+                self.root.after(0, lambda: self.monitor_status.config(text=status_text))
 
-            # 等待间隔时间，但允许及时停止
-            for i in range(interval * 10):
-                if not self.is_monitoring:
-                    break
-                time.sleep(0.1)
+                # 等待间隔时间，但允许及时停止
+                for i in range(interval * 10):
+                    if not self.is_monitoring:
+                        break
+                    time.sleep(0.1)
 
-        self.root.after(0, self.stop_monitoring)
+            self.root.after(0, self.stop_monitoring)
+        except Exception as e:
+            error_msg = f"监控失败: {str(e)}"
+            self.root.after(0, lambda: self.monitor_status.config(text=error_msg))
+            self.root.after(0, self.stop_monitoring)
+        finally:
+            # 线程结束时移除自己
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def update_chart(self):
         """更新监控图表"""
@@ -2383,67 +2546,77 @@ stackoverflow.com"""
             args=(domain, selected_dns, int(self.compare_iterations.get()))
         )
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
 
     def run_dns_comparison(self, domain, dns_servers, iterations):
         """执行 DNS 服务器比较测试"""
-        self.root.after(0, lambda: self.compare_status.config(text="测试进行中..."))
-        self.root.after(0, lambda: self.compare_tree.delete(*self.compare_tree.get_children()))
+        try:
+            self.root.after(0, lambda: self.compare_status.config(text="测试进行中..."))
+            self.root.after(0, lambda: self.compare_tree.delete(*self.compare_tree.get_children()))
 
-        results = []
+            results = []
 
-        for dns_ip in dns_servers:
-            self.root.after(0, lambda ip=dns_ip: self.compare_status.config(text=f"正在测试 {ip}..."))
+            for dns_ip in dns_servers:
+                self.root.after(0, lambda ip=dns_ip: self.compare_status.config(text=f"正在测试 {ip}..."))
 
-            # DNS 解析测试
-            resolution_times = []
-            resolved_ips = set()
-            success_count = 0
+                # DNS 解析测试
+                resolution_times = []
+                resolved_ips = set()
+                success_count = 0
 
-            for i in range(iterations):
-                result = self.test_dns_resolution(domain, dns_ip, self.compare_record_type.get())
-                if result['success']:
-                    resolution_times.append(result['time_ms'])
-                    resolved_ips.update(result['results'].split(', '))
-                    success_count += 1
-                time.sleep(0.5)  # 避免请求过快
+                for i in range(iterations):
+                    result = self.test_dns_resolution(domain, dns_ip, self.compare_record_type.get())
+                    if result['success']:
+                        resolution_times.append(result['time_ms'])
+                        resolved_ips.update(result['results'].split(', '))
+                        success_count += 1
+                    time.sleep(0.5)  # 避免请求过快
 
-            # 访问时延测试（如果解析成功）
-            latency = None
-            if resolved_ips:
-                latency = self.test_access_latency(list(resolved_ips)[0])
+                # 访问时延测试（如果解析成功）
+                latency = None
+                if resolved_ips:
+                    latency = self.test_access_latency(list(resolved_ips)[0])
 
-            # 计算统计信息
-            if resolution_times:
-                avg_resolution = sum(resolution_times) / len(resolution_times)
-                min_resolution = min(resolution_times)
-                max_resolution = max(resolution_times)
-                success_rate = success_count / iterations
-            else:
-                avg_resolution = min_resolution = max_resolution = 0
-                success_rate = 0
+                # 计算统计信息
+                if resolution_times:
+                    avg_resolution = sum(resolution_times) / len(resolution_times)
+                    min_resolution = min(resolution_times)
+                    max_resolution = max(resolution_times)
+                    success_rate = success_count / iterations
+                else:
+                    avg_resolution = min_resolution = max_resolution = 0
+                    success_rate = 0
 
-            # 获取 DNS 提供商名称
-            provider = self.get_dns_provider_name(dns_ip)
+                # 获取 DNS 提供商名称
+                provider = self.get_dns_provider_name(dns_ip)
 
-            result_data = {
-                'dns_ip': dns_ip,
-                'provider': provider,
-                'avg_resolution': avg_resolution,
-                'min_resolution': min_resolution,
-                'max_resolution': max_resolution,
-                'latency': latency or 0,
-                'success_rate': success_rate,
-                'resolved_ips': ', '.join(list(resolved_ips)[:2])  # 只显示前2个IP
-            }
+                result_data = {
+                    'dns_ip': dns_ip,
+                    'provider': provider,
+                    'avg_resolution': avg_resolution,
+                    'min_resolution': min_resolution,
+                    'max_resolution': max_resolution,
+                    'latency': latency or 0,
+                    'success_rate': success_rate,
+                    'resolved_ips': ', '.join(list(resolved_ips)[:2])  # 只显示前2个IP
+                }
 
-            results.append(result_data)
+                results.append(result_data)
 
-        # 按平均解析时间排序
-        results.sort(key=lambda x: x['avg_resolution'])
+            # 按平均解析时间排序
+            results.sort(key=lambda x: x['avg_resolution'])
 
-        # 更新UI
-        self.root.after(0, self.update_comparison_results, results)
+            # 更新UI
+            self.root.after(0, self.update_comparison_results, results)
+        except Exception as e:
+            error_msg = f"DNS比较测试失败: {str(e)}"
+            self.root.after(0, lambda: self.compare_status.config(text=error_msg))
+            self.root.after(0, lambda: messagebox.showerror("错误", error_msg))
+        finally:
+            # 线程结束时移除自己
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def test_access_latency(self, ip_address):
         """测试访问时延 (TCP 连接时间)"""
@@ -2576,33 +2749,39 @@ stackoverflow.com"""
         # 在新线程中执行时延测试
         thread = threading.Thread(target=self.run_latency_test, args=(ip,))
         thread.daemon = True
+        self.add_running_thread(thread)
         thread.start()
 
     def run_latency_test(self, ip):
         """执行访问时延测试"""
-        self.root.after(0, lambda: self.compare_status.config(text="测试访问时延..."))
+        try:
+            self.root.after(0, lambda: self.compare_status.config(text="测试访问时延..."))
 
-        latencies = []
-        iterations = 10
+            latencies = []
+            iterations = 10
 
-        for i in range(iterations):
-            latency = self.test_access_latency(ip)
-            if latency is not None:
-                latencies.append(latency)
-                status = f"测试进度: {i + 1}/{iterations}, 当前时延: {latency:.2f}ms"
-                self.root.after(0, lambda s=status: self.compare_status.config(text=s))
-            time.sleep(1)
+            for i in range(iterations):
+                latency = self.test_access_latency(ip)
+                if latency is not None:
+                    latencies.append(latency)
+                    status = f"测试进度: {i + 1}/{iterations}, 当前时延: {latency:.2f}ms"
+                    self.root.after(0, lambda s=status: self.compare_status.config(text=s))
+                time.sleep(1)
 
-        if latencies:
-            avg_latency = sum(latencies) / len(latencies)
-            min_latency = min(latencies)
-            max_latency = max(latencies)
+            if latencies:
+                avg_latency = sum(latencies) / len(latencies)
+                min_latency = min(latencies)
+                max_latency = max(latencies)
 
-            result_text = (f"访问时延测试完成: 平均 {avg_latency:.2f}ms, "
-                           f"最快 {min_latency:.2f}ms, 最慢 {max_latency:.2f}ms")
-            self.root.after(0, lambda: self.compare_status.config(text=result_text))
-        else:
-            self.root.after(0, lambda: self.compare_status.config(text="访问时延测试失败"))
+                result_text = (f"访问时延测试完成: 平均 {avg_latency:.2f}ms, "
+                               f"最快 {min_latency:.2f}ms, 最慢 {max_latency:.2f}ms")
+                self.root.after(0, lambda: self.compare_status.config(text=result_text))
+            else:
+                self.root.after(0, lambda: self.compare_status.config(text="访问时延测试失败"))
+        finally:
+            # 线程结束时从运行线程列表中移除
+            current_thread = threading.current_thread()
+            self.remove_running_thread(current_thread)
 
     def export_comparison_results(self):
         """导出比较结果"""

@@ -55,7 +55,7 @@ class NextTraceIntegration:
         else:
             if os.path.exists(tools_path):
                 return tools_path
-                
+        
         # 检查项目根目录
         project_path = os.path.join(base_dir, 'nexttrace')
         if platform.system() == 'Windows':
@@ -70,13 +70,13 @@ class NextTraceIntegration:
         try:
             if platform.system() == 'Windows':
                 # Windows下使用where命令
-                result = subprocess.run(['where', 'nexttrace'], capture_output=True, text=True, check=False)
+                result = subprocess.run(['where', 'nexttrace'], capture_output=True, text=True, check=False, **self._get_subprocess_kwargs())
                 if result.returncode == 0:
                     # 返回第一个找到的路径
                     return result.stdout.strip().split('\n')[0]
             else:
                 # Linux/macOS下使用which命令
-                result = subprocess.run(['which', 'nexttrace'], capture_output=True, text=True, check=False)
+                result = subprocess.run(['which', 'nexttrace'], capture_output=True, text=True, check=False, **self._get_subprocess_kwargs())
                 if result.returncode == 0:
                     return result.stdout.strip()
         except Exception as e:
@@ -90,6 +90,20 @@ class NextTraceIntegration:
         :return: True如果NextTrace可用，否则False
         """
         return self.available
+    
+    def _get_subprocess_kwargs(self):
+        """获取subprocess调用的关键字参数，用于隐藏Windows控制台窗口"""
+        kwargs = {
+            'env': {**os.environ, 'PYTHONIOENCODING': 'utf-8'}
+        }
+        
+        # 在Windows系统中隐藏控制台窗口
+        if platform.system() == 'Windows':
+            # 创建标志：隐藏窗口
+            CREATE_NO_WINDOW = 0x08000000
+            kwargs['creationflags'] = CREATE_NO_WINDOW
+        
+        return kwargs
     
     def run_traceroute(self, hostname: str, callback=None, ip_selection_callback=None, **kwargs) -> Dict[str, Any]:
         """运行NextTrace路由追踪
@@ -181,6 +195,7 @@ class NextTraceIntegration:
                 return self._run_with_realtime_callback(cmd, callback, max_hops, timeout, ip_selection_callback)
             else:
                 # 执行命令，使用正确的编码处理
+                subprocess_kwargs = self._get_subprocess_kwargs()
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
@@ -188,7 +203,7 @@ class NextTraceIntegration:
                     errors='replace',  # 处理无法解码的字符
                     check=True,
                     timeout=max_hops * (timeout / 1000) + 30,  # 总超时时间，转换为秒
-                    env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}  # 添加环境变量设置
+                    **subprocess_kwargs
                 )
                 
                 # 解析文本输出
@@ -219,18 +234,22 @@ class NextTraceIntegration:
         import re
         
         # 启动子进程
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            stdin=subprocess.PIPE,  # 添加标准输入支持
-            encoding='utf-8',  # 修改为UTF-8编码
-            errors='replace',  # 处理无法解码的字符
-            universal_newlines=True,
-            bufsize=1,
-            # 添加Windows环境变量设置
-            env={**os.environ, 'PYTHONIOENCODING': 'utf-8'}
-        )
+        try:
+            # 启动进程，使用实时输出
+            subprocess_kwargs = self._get_subprocess_kwargs()
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                stdin=subprocess.PIPE,  # 添加标准输入支持
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='replace',
+                bufsize=1,
+                **subprocess_kwargs
+            )
+        except Exception as e:
+            raise RuntimeError(f"启动NextTrace进程失败: {e}")
         
         hops = []
         current_hop = None
@@ -1081,7 +1100,8 @@ class NextTraceIntegration:
                 [self.nexttrace_path, '-V'],
                 capture_output=True,
                 encoding='utf-8',
-                check=True
+                check=True,
+                **self._get_subprocess_kwargs()
             )
             return result.stdout.strip()
         except Exception as e:
@@ -1179,7 +1199,8 @@ def integrate_with_tracemap(hostname: str, **kwargs) -> Optional[str]:
                 cmd,
                 capture_output=True,
                 encoding='utf-8',
-                timeout=(kwargs.get('max_hops', 15) * kwargs.get('timeout', 10000) / 1000) + 30  # 转换为秒
+                timeout=(kwargs.get('max_hops', 15) * kwargs.get('timeout', 10000) / 1000) + 30,  # 转换为秒
+                **integration._get_subprocess_kwargs()
             )
             
             # 使用备用方法提取路由数据
